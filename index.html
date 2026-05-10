@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ganpati Cafe - Online Order</title>
+    <style>
+        :root { --neon-blue: #00f2ff; --neon-orange: #ff8c00; --dark-bg: #0a0a0a; --card-bg: #1a1a1a; --text-gray: #b0b0b0; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--dark-bg); color: white; margin: 0; padding-bottom: 90px; }
+        
+        /* Header Section */
+        .header { text-align: center; padding: 30px 20px; border-bottom: 2px solid var(--neon-blue); background: linear-gradient(180deg, #111, #000); }
+        .header h1 { color: var(--neon-blue); margin: 0; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px var(--neon-blue); }
+        .header p { color: var(--text-gray); font-size: 0.9rem; margin-top: 8px; }
+
+        /* Smooth Category Navigation */
+        .category-nav { display: flex; overflow-x: auto; padding: 15px; gap: 12px; position: sticky; top: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); z-index: 100; scrollbar-width: none; }
+        .category-nav::-webkit-scrollbar { display: none; }
+        .cat-btn { background: #222; border: 1px solid #444; color: white; padding: 10px 20px; border-radius: 25px; cursor: pointer; white-space: nowrap; transition: 0.3s; font-weight: 500; }
+        .cat-btn.active { background: var(--neon-blue); color: black; border-color: var(--neon-blue); font-weight: bold; }
+
+        /* Enhanced Menu Cards */
+        .menu-container { padding: 15px; max-width: 600px; margin: auto; }
+        .item-card { background: var(--card-bg); margin-bottom: 15px; padding: 18px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; transition: 0.3s; }
+        .item-card:active { transform: scale(0.98); }
+        .item-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; color: #fff; }
+        .item-info p { margin: 0; font-size: 0.85rem; color: var(--text-gray); }
+        
+        .price-controls { text-align: right; }
+        .size-select { background: #2a2a2a; color: white; border: 1px solid #444; padding: 6px; border-radius: 8px; margin-bottom: 8px; font-size: 0.85rem; outline: none; }
+        .add-btn { background: var(--neon-orange); border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(255, 140, 0, 0.3); }
+
+        /* Floating Cart Bar */
+        .cart-strip { position: fixed; bottom: 20px; left: 5%; width: 90%; background: var(--neon-blue); color: black; padding: 18px; display: flex; justify-content: space-between; font-weight: bold; cursor: pointer; border-radius: 15px; box-shadow: 0 10px 30px rgba(0, 242, 255, 0.4); z-index: 1000; font-size: 1.1rem; box-sizing: border-box; }
+
+        /* Checkout Fullscreen Modal */
+        #checkout-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a0a0a; z-index: 2000; padding: 25px; box-sizing: border-box; overflow-y: auto; }
+        .input-box { width: 100%; padding: 15px; margin: 12px 0; background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 10px; font-size: 1rem; box-sizing: border-box; }
+        .qr-section { display: none; background: white; padding: 20px; border-radius: 15px; text-align: center; margin: 20px 0; }
+        .order-btn { background: #25D366; color: white; border: none; width: 100%; padding: 18px; border-radius: 12px; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        
+        .summary-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #333; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Ganpati Cafe</h1>
+    <p>📍 रामनगर कॉलोनी, हनुमानगढ़ | 📞 9664383402</p>
+</div>
+
+<div class="category-nav" id="cat-nav">
+    <button class="cat-btn active" onclick="filterMenu('PIZZAS', this)">Pizzas</button>
+    <button class="cat-btn" onclick="filterMenu('BURGER', this)">Burgers</button>
+    <button class="cat-btn" onclick="filterMenu('SANDWICH', this)">Sandwich</button>
+    <button class="cat-btn" onclick="filterMenu('SIDES', this)">Sides & Maggi</button>
+    <button class="cat-btn" onclick="filterMenu('BEVERAGES', this)">Drinks</button>
+</div>
+
+<div class="menu-container" id="menu-display"></div>
+
+<div class="cart-strip" id="cart-strip" style="display:none;" onclick="openCheckout()">
+    <span id="cart-count">0 Items</span>
+    <span>View Cart - ₹<span id="cart-total">0</span></span>
+</div>
+
+<div id="checkout-screen">
+    <h2 style="color: var(--neon-blue); margin-top: 0;">आपका ऑर्डर</h2>
+    <div id="order-summary" style="margin-bottom: 20px; background: #1a1a1a; padding: 15px; border-radius: 12px;"></div>
+    
+    <input type="text" id="cust-name" class="input-box" placeholder="आपका नाम">
+    <input type="tel" id="cust-phone" class="input-box" placeholder="WhatsApp नंबर">
+    <textarea id="cust-addr" class="input-box" placeholder="डिलीवरी का पूरा पता (Landmark के साथ)"></textarea>
+    
+    <select id="pay-opt" class="input-box" onchange="showQR()">
+        <option value="Cash on Delivery">Cash on Delivery (COD)</option>
+        <option value="Online Payment">Online Payment (UPI)</option>
+    </select>
+
+    <div id="qr-display" class="qr-section">
+        <p style="color:black; font-weight:bold;">Scan & Pay:</p>
+        <img id="qr-img" src="" style="width:200px">
+        <p style="color: #666; font-size:0.8rem; margin-top:10px;">UPI ID: Lalit752002@oksbi</p>
+    </div>
+
+    <button class="order-btn" onclick="sendToWhatsApp()">✅ Confirm Order on WhatsApp</button>
+    <button onclick="closeCheckout()" style="background:none; color:var(--text-gray); border:none; margin-top:20px; width:100%; cursor:pointer;">← Back to Menu</button>
+</div>
+
+<script>
+    const WA_NUMBER = "919664383402";
+    const UPI_ID = "Lalit752002@oksbi";
+
+    const items = [
+        // PIZZAS
+        { cat: "PIZZAS", name: "Margherita Pizza", desc: "Classic cheese pizza", prices: {Reg: 99, Med: 159, Large: 249} },
+        { cat: "PIZZAS", name: "Classical Onion", desc: "Fresh onion & crunchy capsicum", prices: {Reg: 89, Med: 149, Large: 249} },
+        { cat: "PIZZAS", name: "Veggie Supreme", desc: "Loaded with fresh vegetables", prices: {Reg: 119, Med: 199, Large: 299} },
+        { cat: "PIZZAS", name: "Paneer Special", desc: "Spiced paneer cubes with toppings", prices: {Reg: 129, Med: 219, Large: 329} },
+        
+        // BURGERS
+        { cat: "BURGER", name: "Aloo Tikki Burger", desc: "Classic street style", price: 35 },
+        { cat: "BURGER", name: "Cheese Burger", desc: "Extra slice of melted cheese", price: 55 },
+        { cat: "BURGER", name: "Paneer Burger", desc: "Crispy paneer patty", price: 65 },
+        
+        // SANDWICH
+        { cat: "SANDWICH", name: "Veg Grilled Sandwich", desc: "Crispy grilled veggies", price: 49 },
+        { cat: "SANDWICH", name: "Cheese Corn Sandwich", desc: "Sweet corn and extra cheese", price: 69 },
+        { cat: "SANDWICH", name: "Paneer Club Sandwich", desc: "Triple layered goodness", price: 89 },
+
+        // SIDES
+        { cat: "SIDES", name: "Plain Maggi", desc: "Simple and classic", price: 30 },
+        { cat: "SIDES", name: "Masala Veg Maggi", desc: "Spicy with veggies", price: 45 },
+        { cat: "SIDES", name: "French Fries", desc: "Salted crispy fries", price: 60 },
+        
+        // BEVERAGES
+        { cat: "BEVERAGES", name: "Cold Coffee", desc: "Strong and creamy", price: 49 },
+        { cat: "BEVERAGES", name: "Masala Tea", desc: "Handmade ginger tea", price: 20 },
+        { cat: "BEVERAGES", name: "Oreo Shake", desc: "Thick chocolate oreo", price: 79 }
+    ];
+
+    let cart = [];
+
+    function renderMenu(list) {
+        const div = document.getElementById('menu-display');
+        div.innerHTML = list.map((item, idx) => {
+            const uniqueId = item-${item.name.replace(/\s+/g, '-')};
+            return `
+            <div class="item-card">
+                <div class="item-info">
+                    <h3>${item.name}</h3>
+                    <p>${item.desc}</p>
+                </div>
+                <div class="price-controls">
+                    ${item.prices ? `
+                    <select class="size-select" id="size-${uniqueId}">
+                        <option value="${item.prices.Reg}">Reg - ₹${item.prices.Reg}</option>
+                        <option value="${item.prices.Med}">Med - ₹${item.prices.Med}</option>
+                        <option value="${item.prices.Large}">Large - ₹${item.prices.Large}</option>
+                    </select>` : <span style="display:block; margin-bottom:8px; font-weight:bold;">₹${item.price}</span>}
+                    <button class="add-btn" onclick="addToCart('${item.name}', '${uniqueId}', ${!!item.prices})">ADD +</button>
+                </div>
+            </div>
+        `}).join('');
+    }
+
+    function filterMenu(c, btn) {
+        document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderMenu(items.filter(i => i.cat === c));
+    }
+
+    function addToCart(name, id, isPizza) {
+        const item = items.find(i => i.name === name);
+        let p = isPizza ? parseInt(document.getElementById(size-${id}).value) : item.price;
+        let s = isPizza ? document.getElementById(size-${id}).options[document.getElementById(size-${id}).selectedIndex].text.split(' -')[0] : "";
+        
+        cart.push({ n: name, p: p, s: s });
+        updateCart();
+        
+        // Visual Feedback
+        document.getElementById('cart-strip').style.display = 'flex';
+    }
+
+    function updateCart() {
+        const total = cart.reduce((a, b) => a + b.p, 0);
+        document.getElementById('cart-count').innerText = ${cart.length} Items;
+        document.getElementById('cart-total').innerText = total;
+    }
+
+    function showQR() {
+        const opt = document.getElementById('pay-opt').value;
+        const total = document.getElementById('cart-total').innerText;
+        const qrDiv = document.getElementById('qr-display');
+        if(opt === "Online Payment") {
+            qrDiv.style.display = "block";
+            document.getElementById('qr-img').src = https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${UPI_ID}%26pn=Lalit%26am=${total}%26cu=INR;
+        } else { qrDiv.style.display = "none"; }
+    }
+
+    function openCheckout() {
+        if(cart.length === 0) return alert("कार्ट खाली है!");
+        document.getElementById('checkout-screen').style.display = 'block';
+        const summaryHtml = cart.map(i => `
+            <div class="summary-item">
+                <span>${i.n} ${i.s}</span>
+                <span>₹${i.p}</span>
+            </div>
+        `).join('');
+        document.getElementById('order-summary').innerHTML = summaryHtml + `
+            <div class="summary-item" style="border-top: 2px solid #444; margin-top:10px; font-weight:bold; font-size:1.2rem; color:var(--neon-blue);">
+                <span>Total Amount</span>
+                <span>₹${document.getElementById('cart-total').innerText}</span>
+            </div>`;
+    }
+
+    function closeCheckout() { document.getElementById('checkout-screen').style.display = 'none'; }
+
+    function sendToWhatsApp() {
+        const n = document.getElementById('cust-name').value;
+        const ph = document.getElementById('cust-phone').value;
+        const ad = document.getElementById('cust-addr').value;
+        const py = document.getElementById('pay-opt').value;
+        if(!n || !ph || !ad) return alert("कृपया पूरी जानकारी भरें ताकि हम आप तक पहुँच सकें।");
+        
+        let txt = cart.map(i => ✅ ${i.n} ${i.s} - ₹${i.p}).join('%0A');
+        const msg = *New Order: Ganpati Cafe*%0A%0A*Customer:* ${n}%0A*WhatsApp:* ${ph}%0A*Address:* ${ad}%0A%0A*Items:*%0A${txt}%0A%0A*Grand Total:* ₹${document.getElementById('cart-total').innerText}%0A*Payment Mode:* ${py}%0A%0A_Sent via Ganpati Web App_;
+        window.open(https://wa.me/${WA_NUMBER}?text=${msg});
+    }
+
+    // Default Load
+    renderMenu(items.filter(i => i.cat === 'PIZZAS'));
+</script>
+
+</body>
+</html>
